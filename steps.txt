@@ -1,0 +1,59 @@
+KATTADITMT GUI - WINDOWS SETUP STEPS
+
+These commands install the dependencies and run the Python GUI.
+Use PowerShell in the folder that contains this file.
+
+1. Check that Python is installed
+
+py --version
+
+Python 3.10 or newer is recommended. If the command is not found, install Python from https://www.python.org/downloads/ and enable "Add Python to PATH" during installation.
+
+2. Open the project folder
+
+cd "C:\Users\YourName\KattadiTMT\KattadiTMT"
+
+Replace C:\Users\YourName\KattadiTMT\KattadiTMT with the actual project folder path on the laptop.
+
+3. Create a virtual environment
+
+py -m venv .venv
+
+If .venv already exists, this command can be skipped.
+
+4. Install the required packages
+
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install customtkinter pyserial Pillow
+
+Package/import mapping:
+- customtkinter -> import customtkinter
+- pyserial -> import serial
+- Pillow -> from PIL import Image, ImageEnhance
+
+5. Verify all dependencies
+
+.\.venv\Scripts\python.exe -c "import customtkinter, serial, serial.tools.list_ports; from PIL import Image, ImageEnhance; print('Dependencies installed successfully')"
+
+6. Run the GUI
+
+.\.venv\Scripts\python.exe ".\Graphic User Inteface.py"
+
+The GUI uses a COM port to communicate with the robot. Connect the controller and select its COM port in the application before pressing Connect.
+
+7. Optional: activate the virtual environment first
+
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install customtkinter pyserial Pillow
+python ".\Graphic User Inteface.py"
+
+If PowerShell blocks activation, use the direct .venv\Scripts\python.exe commands above. Activation is not required.
+
+8. If the COM port is not detected
+
+Run this command to list available serial ports:
+
+.\.venv\Scripts\python.exe -c "import serial.tools.list_ports; print([p.device for p in serial.tools.list_ports.comports()])"
+
+Install the USB driver for the robot controller if no COM port appears.
