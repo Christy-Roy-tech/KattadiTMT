@@ -2,23 +2,22 @@
 
 
 
-# [Project Name] 🎯
+# Pappadam Plucker
 
 
 ## Basic Details
-### Team Name: [Name]
+### Team Name: KattadiTMT: Ith kaatath adilla
 
 
 ### Team Members
-- Team Lead: [Name] - [College]
-- Member 2: [Name] - [College]
-- Member 3: [Name] - [College]
+- Team Lead: Mekha Rachel - Saintgits College of Engineering
+- Member 2: Christy Roy - Saintgits College of Engineering
 
 ### Project Description
-[2-3 lines about what your project does]
+We KattadiTMT, presenting to you our Autonomous Pappadam Plucker  
 
 ### The Problem (that doesn't exist)
-[What ridiculous problem are you solving?]
+While eating rice,we often have to crush papaddam first before mixing it with rice and curry. This 
 
 ### The Solution (that nobody asked for)
 [How are you solving it? Keep it fun!]
