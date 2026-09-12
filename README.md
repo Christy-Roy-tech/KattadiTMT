@@ -17,7 +17,7 @@
 We KattadiTMT, presenting to you our Autonomous Pappadam Plucker  
 
 ### The Problem (that doesn't exist)
-While eating rice,we often have to crush papaddam first before mixing it with rice and curry. This 
+While eating rice,we often have to crush papaddam first before mixing it with rice and curry. This robotic arm helps us crush papadam before eating 
 
 ### The Solution (that nobody asked for)
 [How are you solving it? Keep it fun!]
