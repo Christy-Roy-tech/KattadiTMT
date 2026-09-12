@@ -4,11 +4,11 @@ import serial
 import serial.tools.list_ports
 import time
 from PIL import Image, ImageEnhance
-
-
+ 
+ 
 # --- Initialize Modern Monochrome Glass Theme ---
 ctk.set_appearance_mode("dark")  
-
+ 
 class RobotArmPro:
     def __init__(self, root):
         self.root = root
@@ -30,57 +30,80 @@ class RobotArmPro:
             self.bg_label.place(relx=0.5, rely=0.5, anchor="center")
         except Exception as e:
             print(f"Background image not found or error: {e}")
-
+ 
         self.ser = None
         self.is_powered = False
         self.last_val = {} 
-
+ 
         # --- DYNAMIC PRESET STORAGE ---
         self.pluck_coords = None
         self.unpluck_coords = None
-
+ 
+        # --- COM PORT DETECTION STORAGE ---
+        # Maps the human-readable dropdown label -> raw device name (e.g. "COM5")
+        self.port_lookup = {}
+ 
         self.main_container = ctk.CTkScrollableFrame(self.root, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True)
-
+ 
         self.setup_ui()
-
+ 
     def create_glass_frame(self, parent, title):
         container = ctk.CTkFrame(parent, fg_color="transparent")
         container.pack(fill="x", padx=15, pady=10)
-
+ 
         # Gradient step 1: Medium gray labels
         lbl = ctk.CTkLabel(container, text=title, font=("Segoe UI", 12, "bold"), text_color="#888888")
         lbl.pack(anchor="w", padx=15, pady=(0, 5))
-
+ 
         # Gradient step 2: Very dark gray panels with slightly lighter borders for edge highlights
         # Using a slightly transparent hex or very dark color to let the background breathe
         glass = ctk.CTkFrame(container, fg_color="#0A0A0A", corner_radius=16, 
                              border_width=1, border_color="#222222")
         glass.pack(fill="x")
         return glass
-
+ 
     def setup_ui(self):
         # --- Connection Section ---
         c_frame = self.create_glass_frame(self.main_container, "USB CONNECTION")
         
         inner_c = ctk.CTkFrame(c_frame, fg_color="transparent")
         inner_c.pack(padx=15, pady=15, fill="x")
-        
-        self.port_entry = ctk.CTkEntry(inner_c, width=200, placeholder_text="COM Port", 
-                                       corner_radius=8, fg_color="#000000", border_width=1, border_color="#333333")
-        self.port_entry.pack(side="left", padx=(0, 10))
-        
+ 
+        # Dropdown of auto-detected COM ports, replacing the old manual text entry
+        self.port_var = ctk.StringVar(value="Scanning...")
+        self.port_menu = ctk.CTkOptionMenu(inner_c, width=190, variable=self.port_var,
+                                           values=["Scanning..."], corner_radius=8,
+                                           fg_color="#000000", button_color="#1A1A1A",
+                                           button_hover_color="#333333", text_color="#FFFFFF",
+                                           dropdown_fg_color="#0A0A0A", dropdown_hover_color="#222222",
+                                           font=("Segoe UI", 12))
+        self.port_menu.pack(side="left", padx=(0, 8))
+ 
+        # Small refresh button to re-scan ports on demand (e.g. after plugging the board in)
+        ctk.CTkButton(inner_c, text="⟳", width=36, corner_radius=8,
+                      fg_color="#1A1A1A", hover_color="#333333", text_color="#FFFFFF",
+                      font=("Segoe UI", 14, "bold"), command=self.refresh_ports).pack(side="left", padx=(0, 8))
+ 
         # Gradient step 3: Pure white buttons with black text
-        ctk.CTkButton(inner_c, text="Connect", width=100, corner_radius=8, 
+        ctk.CTkButton(inner_c, text="Connect", width=90, corner_radius=8, 
                       fg_color="#FFFFFF", text_color="#000000", hover_color="#CCCCCC", 
                       font=("Segoe UI", 13, "bold"), command=self.toggle_connection).pack(side="left")
-
+ 
+        # Status line: shows how many ports were found, or the live connection state
+        self.lbl_conn_status = ctk.CTkLabel(c_frame, text="", font=("Segoe UI", 11),
+                                            text_color="#666666", anchor="w")
+        self.lbl_conn_status.pack(fill="x", padx=15, pady=(0, 15))
+ 
+        # Auto-detect ports as soon as the UI is built, so the dropdown isn't empty on launch
+        self.refresh_ports()
+ 
         # --- Power Button ---
         self.pwr_btn = ctk.CTkButton(self.main_container, text="ENABLE SYSTEM", fg_color="#111111", hover_color="#222222",
                                      height=55, font=("Segoe UI", 15, "bold"), corner_radius=12, text_color="#555555",
                                      command=self.toggle_power, state="disabled", border_width=1, border_color="#333333")
         self.pwr_btn.pack(fill="x", padx=20, pady=(5, 15))
-
+ 
         # --- Base 360 Control ---
         b_frame = self.create_glass_frame(self.main_container, "BASE ROTATION (360 MG995)")
         inner_b = ctk.CTkFrame(b_frame, fg_color="transparent")
@@ -97,19 +120,19 @@ class RobotArmPro:
         self.br.grid(row=0, column=1, padx=10)
         self.br.bind("<ButtonPress-1>", lambda e: self.send_cmd("B:R"))
         self.br.bind("<ButtonRelease-1>", lambda e: self.send_cmd("B:S"))
-
+ 
         # --- Joint Sliders ---
         s_frame = self.create_glass_frame(self.main_container, "JOINT POSITIONS")
         self.create_slider(s_frame, "Shoulder (MG995)", 0, 180,  "A1", invert=True)
-        self.create_slider(s_frame, "Elbow (SG90)", 9, 152, "A2", invert=True)
+        self.create_slider(s_frame, "Elbow (SG90)", 9, 64, "A2")
         self.create_slider(s_frame, "Wrist Pitch (MG995)", 0, 180, "A3")
-        self.create_slider(s_frame, "Wrist Roll (SG90)", 0, 180, "A4")
-
+        self.create_slider(s_frame, "Wrist Roll (SG90)", 0, 180, "A4", invert=True)
+ 
         # --- Gripper Section (Slider) ---
         g_frame = self.create_glass_frame(self.main_container, "GRIPPER CONTROL")
-
+ 
         self.create_slider(g_frame, "Gripper Claw", 0, 90, "G", smooth=False)
-
+ 
         # --- DYNAMIC PRESET SECTION ---
         p_frame = self.create_glass_frame(self.main_container, "DYNAMIC PRESETS (Transport -> Actuate)")
         
@@ -131,7 +154,7 @@ class RobotArmPro:
         
         self.lbl_pluck = ctk.CTkLabel(pluck_row, text="[Unsaved]", font=("Segoe UI", 12), text_color="#555555")
         self.lbl_pluck.pack(side="left", padx=10)
-
+ 
         # Unpluck Row
         unpluck_row = ctk.CTkFrame(p_frame, fg_color="transparent")
         unpluck_row.pack(fill="x", padx=15, pady=(5, 15))
@@ -149,25 +172,25 @@ class RobotArmPro:
         
         self.lbl_unpluck = ctk.CTkLabel(unpluck_row, text="[Unsaved]", font=("Segoe UI", 12), text_color="#555555")
         self.lbl_unpluck.pack(side="left", padx=10)
-
+ 
     def create_slider(self, parent, label_text, f, t, prefix, invert=False, smooth=False):
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", padx=15, pady=12)
-
+ 
         lbl_frame = ctk.CTkFrame(row, fg_color="transparent")
         lbl_frame.pack(fill="x", pady=(0, 5))
-
+ 
         lbl = ctk.CTkLabel(lbl_frame, text=label_text, font=("Segoe UI", 13), text_color="#AAAAAA")
         lbl.pack(side="left")
-
+ 
         val_lbl = ctk.CTkLabel(lbl_frame, text=str(f), font=("Segoe UI", 14, "bold"), text_color="#FFFFFF")
         val_lbl.pack(side="right")
-
+ 
         initial_val = t if invert else f
         current_val = [initial_val]
         target_val = [initial_val]
         is_smoothing = [False]
-
+ 
         def smooth_loop():
             if current_val[0] == target_val[0]:
                 is_smoothing[0] = False
@@ -181,12 +204,12 @@ class RobotArmPro:
                 
             self.send_cmd(f"{prefix}:{current_val[0]}")
             self.root.after(15, smooth_loop)
-
+ 
         def on_slide(v):
             val = int(v)
             val_lbl.configure(text=str(val))
             sent_val = t - (val - f) if invert else val
-
+ 
             if smooth:
                 target_val[0] = sent_val
                 if not is_smoothing[0]:
@@ -194,7 +217,7 @@ class RobotArmPro:
                     smooth_loop()
             else:
                 self.send_cmd(f"{prefix}:{sent_val}")
-
+ 
         # Monochrome slider (Black track, Pure White progress)
         s = ctk.CTkSlider(row, from_=f, to=t, command=on_slide, state="disabled",
                           button_color="#FFFFFF", button_hover_color="#CCCCCC", 
@@ -208,7 +231,7 @@ class RobotArmPro:
             
         setattr(self, f"set_{prefix}", set_and_trigger)
         setattr(self, f"s_{prefix}", s)
-
+ 
     # --- SAVE PRESET FUNCTIONS ---
     def save_pluck(self):
         self.pluck_coords = {
@@ -216,35 +239,42 @@ class RobotArmPro:
             'A3': int(self.s_A3.get()), 'A4': int(self.s_A4.get()), 'G': int(self.s_G.get())
         }
         self.lbl_pluck.configure(text="[Saved!]", text_color="#FFFFFF")
+        # FIX: immediately enable the Run button now that a pose exists,
+        # instead of waiting for the next power toggle to pick it up.
+        if self.is_powered:
+            self.btn_run_pluck.configure(state="normal")
         print(f"✅ Pluck Saved: {self.pluck_coords}")
-
+ 
     def save_unpluck(self):
         self.unpluck_coords = {
             'A1': int(self.s_A1.get()), 'A2': int(self.s_A2.get()), 
             'A3': int(self.s_A3.get()), 'A4': int(self.s_A4.get()), 'G': int(self.s_G.get())
         }
         self.lbl_unpluck.configure(text="[Saved!]", text_color="#FFFFFF")
+        # FIX: same as above, for the Unpluck preset.
+        if self.is_powered:
+            self.btn_run_unpluck.configure(state="normal")
         print(f"✅ Unpluck Saved: {self.unpluck_coords}")
-
+ 
     # --- RUN PRESET FUNCTIONS ---
     def run_pluck(self):
         if self.pluck_coords:
             self.animate_pose(self.pluck_coords, duration=2.0)
         else:
             messagebox.showwarning("Empty", "Please 'Save Pluck' position first!")
-
+ 
     def run_unpluck(self):
         if self.unpluck_coords:
             self.animate_pose(self.unpluck_coords, duration=2.0)
         else:
             messagebox.showwarning("Empty", "Please 'Save Unpluck' position first!")
-
+ 
     # --- SEQUENCED ANIMATOR (Arm first, then Gripper) ---
     def animate_pose(self, targets, duration):
         arm_steps = 50  
         arm_delay_ms = int((duration / arm_steps) * 1000)
         arm_keys = ['A1', 'A2', 'A3', 'A4']
-
+ 
         # Get Starting Positions
         starts = {
             'A1': int(self.s_A1.get()), 'A2': int(self.s_A2.get()), 
@@ -253,13 +283,13 @@ class RobotArmPro:
         
         # Calculate increments just for the arm joints
         arm_increments = {k: (targets[k] - starts[k]) / arm_steps for k in arm_keys if k in targets}
-
+ 
         # Lock UI controls during animation safely using CTk
         controls_to_disable = ["s_A1", "s_A2", "s_A3", "s_A4", "s_G", "btn_save_pluck", "btn_run_pluck", "btn_save_unpluck", "btn_run_unpluck"]
         for key in controls_to_disable:
             if hasattr(self, key):
                 getattr(self, key).configure(state="disabled")
-
+ 
         # --- PHASE 1: Move the Arm ---
         def step_arm(current_step):
             if current_step <= arm_steps:
@@ -273,7 +303,7 @@ class RobotArmPro:
                     actuate_gripper()
                 else:
                     finish_animation()
-
+ 
         # --- PHASE 2: Actuate the Gripper ---
         def actuate_gripper():
             target_g = targets['G']
@@ -285,24 +315,88 @@ class RobotArmPro:
             # Estimate time to close (15ms per degree of change)
             time_to_close_ms = abs(target_g - start_g) * 15
             self.root.after(time_to_close_ms + 100, finish_animation)
-
+ 
         # --- UNLOCK UI ---
         def finish_animation():
             for key in controls_to_disable:
                 if hasattr(self, key):
                     getattr(self, key).configure(state="normal")
+            # FIX: after unlocking, re-apply the correct disabled state for
+            # Run buttons whose preset hasn't been saved yet (they were
+            # blanket re-enabled above along with everything else).
+            if not self.pluck_coords and hasattr(self, "btn_run_pluck"):
+                self.btn_run_pluck.configure(state="disabled")
+            if not self.unpluck_coords and hasattr(self, "btn_run_unpluck"):
+                self.btn_run_unpluck.configure(state="disabled")
             print("✅ Sequenced Movement Complete!")
-
+ 
         # Start sequence
         step_arm(1)
-
+ 
+    # --- COM PORT DETECTION ---
+    def get_available_ports(self):
+        """Return the list of currently connected serial ports (as ListPortInfo objects)."""
+        return list(serial.tools.list_ports.comports())
+ 
+    def refresh_ports(self):
+        """Re-scan the system for serial ports and refresh the dropdown + status label."""
+        ports = self.get_available_ports()
+ 
+        if not ports:
+            self.port_menu.configure(values=["No ports found"])
+            self.port_var.set("No ports found")
+            self.port_lookup = {}
+            self.lbl_conn_status.configure(
+                text="⚠ No devices detected — check the USB cable/drivers",
+                text_color="#777777"
+            )
+            return
+ 
+        # Build "COM5 - USB-SERIAL CH340" style labels for readability,
+        # while keeping a lookup back to the raw device name pyserial needs.
+        self.port_lookup = {}
+        display_values = []
+        for p in ports:
+            has_desc = p.description and p.description.lower() != "n/a"
+            label = f"{p.device} - {p.description}" if has_desc else p.device
+            self.port_lookup[label] = p.device
+            display_values.append(label)
+ 
+        self.port_menu.configure(values=display_values)
+ 
+        # Keep the current selection if that device is still plugged in,
+        # otherwise fall back to the first detected port.
+        if self.port_var.get() not in display_values:
+            self.port_var.set(display_values[0])
+ 
+        if not self.is_connected():
+            self.lbl_conn_status.configure(
+                text=f"✓ {len(ports)} port(s) detected",
+                text_color="#4CD964"
+            )
+ 
+    def is_connected(self):
+        return bool(self.ser and self.ser.is_open)
+ 
     def toggle_connection(self):
+        selected = self.port_var.get()
+ 
+        if selected in ("Scanning...", "No ports found"):
+            messagebox.showwarning("No Port", "No COM port selected. Click ⟳ to scan again.")
+            return
+ 
+        # Resolve the friendly dropdown label back to the actual device name (e.g. "COM5")
+        device = self.port_lookup.get(selected, selected)
+ 
         try:
-            self.ser = serial.Serial(self.port_entry.get(), 115200, timeout=0.05)
+            self.ser = serial.Serial(device, 115200, timeout=0.05)
             self.pwr_btn.configure(state="normal")
-            messagebox.showinfo("USB", "Connected to Robot!")
-        except Exception as e: messagebox.showerror("Error", str(e))
-
+            self.lbl_conn_status.configure(text=f"● Connected on {device}", text_color="#FFFFFF")
+            messagebox.showinfo("USB", f"Connected to Robot on {device}!")
+        except Exception as e:
+            self.lbl_conn_status.configure(text=f"✗ Connection failed: {e}", text_color="#FF5555")
+            messagebox.showerror("Error", str(e))
+ 
     def toggle_power(self):
         self.is_powered = not self.is_powered
         st = "normal" if self.is_powered else "disabled"
@@ -330,7 +424,7 @@ class RobotArmPro:
             self.btn_save_unpluck.configure(state="disabled")
             self.btn_run_pluck.configure(state="disabled")
             self.btn_run_unpluck.configure(state="disabled")
-
+ 
     def send_cmd(self, cmd):
         if ":" in cmd:
             pre, val = cmd.split(":")
@@ -338,8 +432,9 @@ class RobotArmPro:
             self.last_val[pre] = val
         if self.ser and self.ser.is_open:
             self.ser.write((cmd + '\n').encode())
-
+ 
 if __name__ == "__main__":
     root = ctk.CTk()
     app = RobotArmPro(root)
     root.mainloop()
+ 
