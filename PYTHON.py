@@ -123,7 +123,7 @@ class RobotArmPro:
  
         # --- Joint Sliders ---
         s_frame = self.create_glass_frame(self.main_container, "JOINT POSITIONS")
-        self.create_slider(s_frame, "Shoulder (MG995)", 0, 180,  "A1")
+        self.create_slider(s_frame, "Shoulder (MG995)", 0, 180,  "A1", invert=True)
         self.create_slider(s_frame, "Elbow (SG90)", 9, 152, "A2", invert=True)
         self.create_slider(s_frame, "Wrist Pitch (MG995)", 0, 180, "A3")
         self.create_slider(s_frame, "Wrist Roll (SG90)", 0, 180, "A4")
