@@ -223,6 +223,8 @@ On first launch, the app asks you to drag a rectangle tightly around the plate. 
 
 ---
 
+Read a midnight unfilltered work experience we had during Tinkerhub useless project journal.md
+
 Made with ❤️ at TinkerHub Useless Projects
 
 ![Static Badge](https://img.shields.io/badge/TinkerHub-24?color=%23000000&link=https%3A%2F%2Fwww.tinkerhub.org%2F)
