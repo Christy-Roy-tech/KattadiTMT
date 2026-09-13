@@ -126,7 +126,7 @@ class RobotArmPro:
         self.create_slider(s_frame, "Shoulder (MG995)", 0, 180,  "A1", invert=True)
         self.create_slider(s_frame, "Elbow (SG90)", 9, 64, "A2")
         self.create_slider(s_frame, "Wrist Pitch (MG995)", 0, 180, "A3")
-        self.create_slider(s_frame, "Wrist Roll (SG90)", 0, 180, "A4")
+        self.create_slider(s_frame, "Wrist Roll (SG90)", 0, 180, "A4", invert=True)
  
         # --- Gripper Section (Slider) ---
         g_frame = self.create_glass_frame(self.main_container, "GRIPPER CONTROL")
@@ -239,6 +239,10 @@ class RobotArmPro:
             'A3': int(self.s_A3.get()), 'A4': int(self.s_A4.get()), 'G': int(self.s_G.get())
         }
         self.lbl_pluck.configure(text="[Saved!]", text_color="#FFFFFF")
+        # FIX: immediately enable the Run button now that a pose exists,
+        # instead of waiting for the next power toggle to pick it up.
+        if self.is_powered:
+            self.btn_run_pluck.configure(state="normal")
         print(f"✅ Pluck Saved: {self.pluck_coords}")
  
     def save_unpluck(self):
@@ -247,6 +251,9 @@ class RobotArmPro:
             'A3': int(self.s_A3.get()), 'A4': int(self.s_A4.get()), 'G': int(self.s_G.get())
         }
         self.lbl_unpluck.configure(text="[Saved!]", text_color="#FFFFFF")
+        # FIX: same as above, for the Unpluck preset.
+        if self.is_powered:
+            self.btn_run_unpluck.configure(state="normal")
         print(f"✅ Unpluck Saved: {self.unpluck_coords}")
  
     # --- RUN PRESET FUNCTIONS ---
@@ -314,6 +321,13 @@ class RobotArmPro:
             for key in controls_to_disable:
                 if hasattr(self, key):
                     getattr(self, key).configure(state="normal")
+            # FIX: after unlocking, re-apply the correct disabled state for
+            # Run buttons whose preset hasn't been saved yet (they were
+            # blanket re-enabled above along with everything else).
+            if not self.pluck_coords and hasattr(self, "btn_run_pluck"):
+                self.btn_run_pluck.configure(state="disabled")
+            if not self.unpluck_coords and hasattr(self, "btn_run_unpluck"):
+                self.btn_run_unpluck.configure(state="disabled")
             print("✅ Sequenced Movement Complete!")
  
         # Start sequence
@@ -423,3 +437,4 @@ if __name__ == "__main__":
     root = ctk.CTk()
     app = RobotArmPro(root)
     root.mainloop()
+ 
