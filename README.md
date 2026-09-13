@@ -3,7 +3,7 @@
 
 # Pappadam Plucker
 
-![Pappadam Plucker Front Page](./assets/front page(1).png)
+![Pappadam Plucker Front Page](./assets/front%20page%20(1).png)
 
 > An unnecessarily advanced robotic system that detects a pappadam, locks onto it, and crushes it before it can peacefully join your rice and curry.
 
@@ -142,13 +142,9 @@ This reduces false targets caused by hands, plate reflections, shadows, rectangu
 
 *The OpenCV detector locks onto the pappadam and draws a crosshair at its calculated centre.*
 
-![Robot arm control panel](./assets/robot_control_panel.png)
-
-*The dark-glass control interface used to connect the ESP32, manually control the robot joints, and save pluck/unpluck coordinates.*
+*The dark-glass control interface is implemented in the integrated Python application.*
 
 ### Workflow Diagram
-
-![Workflow](./assets/workflow.png)
 
 *System flow: Intro screen → CRT transition → empty-plate calibration → live scanning → target lock → pluck motion → crunch → return home → scan again.*
 
@@ -166,17 +162,21 @@ This reduces false targets caused by hands, plate reflections, shadows, rectangu
 
 ### Build Photos
 
-![Components](./assets/components.png)
+![Pappadam Plucker front page](./assets/front%20page%20(1).png)
 
-*Main system components: robot arm, ESP32, PCA9685 servo driver, servo motors, power module, phone camera, plate, and pappadam.*
+*Project front page and main build presentation.*
 
-![Build process](./assets/build_process.png)
+![Pappadam detection target](./assets/pappadam_labeled.png)
 
-*The robot arm was assembled, wired, powered, and calibrated through individual joint controls.*
+*Labeled pappadam target used during the computer-vision detection workflow.*
 
-![Final build](./assets/final_build.png)
+![Power module wiring](./assets/power_module_wiring_1.png)
 
-*The completed Autonomous Pappadam Plucker ready to identify and crush its target.*
+*First power-module wiring build.*
+
+![Power module wiring revision](./assets/power_module_wiring_2.png)
+
+*Second power-module wiring revision.*
 
 ## Build Log
 
