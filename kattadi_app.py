@@ -49,7 +49,14 @@ VHS_VIDEO_PATH       = os.path.join(REF_DIR,
 VHS_OPTIMIZED_PATH   = os.path.join(REF_DIR, "vhs_optimized.mp4")
 DETECTION_IMG_PATH   = os.path.join(REF_DIR, "detection.png")
 CELEBRATION_VID_PATH = os.path.join(REF_DIR, "papadam detected.mp4")
+CELEB_OPTIMIZED_PATH = os.path.join(REF_DIR, "papadam_detected_optimized.mp4")
 COWBOY_THEME_PATH    = os.path.join(REF_DIR, "cowboy_theme.mp3")
+CELEB_AUDIO_PATH     = os.path.join(REF_DIR, "papadam detected.mp3")
+STATIC_AUDIO_PATH    = (
+    os.path.join(REF_DIR, "static.mp3")
+    if os.path.exists(os.path.join(REF_DIR, "static.mp3"))
+    else os.path.join(REF_DIR, "static..mp3")
+)
 COORDINATES_PATH     = os.path.join(BASE_DIR, "coordinates.txt")
 SAVED_CONFIG_PATH    = os.path.join(BASE_DIR, "saved_coordinates.json")
 ROI_CONFIG_PATH      = os.path.join(BASE_DIR, "saved_roi.json")
@@ -127,6 +134,7 @@ def detect_pappadam(frame, bg_gray):
                                 cv2.CHAIN_APPROX_SIMPLE)
 
     best, best_area = None, 0
+    best_bbox = None
     for c in cnts:
         a = cv2.contourArea(c)
         if a < MIN_AREA:
@@ -146,6 +154,7 @@ def detect_pappadam(frame, bg_gray):
         if a > best_area:
             best_area = a
             best = c
+            best_bbox = (x, y, w, h)
 
     if best is None:
         return None
@@ -153,7 +162,7 @@ def detect_pappadam(frame, bg_gray):
     hull  = cv2.convexHull(best)
     ha    = cv2.contourArea(hull)
     circ  = hull_circularity(hull, ha)
-    return (int(cx), int(cy), int(r), circ)
+    return (int(cx), int(cy), int(r), circ, best_bbox)
 
 
 # ═════════════════════════════════════════════════════════════════
@@ -216,16 +225,20 @@ class KattadiApp:
         # ── photo refs (prevent GC) ─────────
         self._pr = None
         self._pr2 = None
-        self._vhs_frames     = []
-        self._vhs_photos     = []
-        self._vhs_canvas_img = None
+        self._vhs_frames       = []
+        self._vhs_photos       = []
+        self._vhs_canvas_img   = None
+        self._celeb_frames     = []
+        self._celeb_photos     = []
         self._celeb_canvas_img = None
+        self.snd_static        = None
+        self.snd_celeb         = None
 
         # ── boot ─────────────────────────────
         self._load_assets()
         self._load_coords()
         self._connect_serial()
-        threading.Thread(target=self._preload_vhs, daemon=True).start()
+        threading.Thread(target=self._preload_videos, daemon=True).start()
 
         self.root.after(200, self.show_splash)
         self.root.protocol("WM_DELETE_WINDOW", self.cleanup_and_exit)
@@ -247,90 +260,147 @@ class KattadiApp:
             print(f"[WARN] detection overlay: {e}")
             self.det_overlay = None
 
-    def _preload_vhs(self):
-        """Pre-decode and resize VHS frames in background during splash screen for smooth 30-45 FPS."""
-        src = VHS_OPTIMIZED_PATH if os.path.exists(VHS_OPTIMIZED_PATH) else VHS_VIDEO_PATH
-        if not os.path.exists(src):
-            return
-        try:
-            cap = cv2.VideoCapture(src)
-            frames = []
-            while self.running:
-                ret, f = cap.read()
-                if not ret:
-                    break
-                f = cv2.resize(f, (self.sw, self.sh), interpolation=cv2.INTER_LINEAR)
-                f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
-                frames.append(f)
-            cap.release()
-            self._vhs_frames = frames
-            print(f"[OK] VHS video preloaded: {len(frames)} frames ready for instant 30-45 FPS playback")
-        except Exception as e:
-            print(f"[WARN] VHS preload: {e}")
+        if HAS_AUDIO:
+            if os.path.exists(STATIC_AUDIO_PATH):
+                try:
+                    self.snd_static = pygame.mixer.Sound(STATIC_AUDIO_PATH)
+                    print("[OK] static audio loaded")
+                except Exception as e:
+                    print(f"[WARN] static audio: {e}")
+            if os.path.exists(CELEB_AUDIO_PATH):
+                try:
+                    self.snd_celeb = pygame.mixer.Sound(CELEB_AUDIO_PATH)
+                    print("[OK] celebration audio loaded")
+                except Exception as e:
+                    print(f"[WARN] celebration audio: {e}")
+
+    def _preload_videos(self):
+        """Pre-decode and resize VHS and Celebration frames in background for smooth 30-45 FPS playback."""
+        # 1) VHS transition video
+        vhs_src = VHS_OPTIMIZED_PATH if os.path.exists(VHS_OPTIMIZED_PATH) else VHS_VIDEO_PATH
+        if os.path.exists(vhs_src):
+            try:
+                cap = cv2.VideoCapture(vhs_src)
+                frames = []
+                while self.running:
+                    ret, f = cap.read()
+                    if not ret:
+                        break
+                    f = cv2.resize(f, (self.sw, self.sh), interpolation=cv2.INTER_LINEAR)
+                    f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+                    frames.append(f)
+                cap.release()
+                self._vhs_frames = frames
+                print(f"[OK] VHS video preloaded: {len(frames)} frames ready")
+            except Exception as e:
+                print(f"[WARN] VHS preload: {e}")
+
+        # 2) Celebration video (papadam detected.mp4)
+        celeb_src = CELEB_OPTIMIZED_PATH if os.path.exists(CELEB_OPTIMIZED_PATH) else CELEBRATION_VID_PATH
+        if os.path.exists(celeb_src):
+            try:
+                cap = cv2.VideoCapture(celeb_src)
+                frames = []
+                while self.running:
+                    ret, f = cap.read()
+                    if not ret:
+                        break
+                    f = cv2.resize(f, (self.sw, self.sh), interpolation=cv2.INTER_LINEAR)
+                    f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+                    frames.append(f)
+                cap.release()
+                self._celeb_frames = frames
+                print(f"[OK] Celebration video preloaded: {len(frames)} frames ready")
+            except Exception as e:
+                print(f"[WARN] Celebration preload: {e}")
 
     # ─────────────────────────────────────────────────────────────
     # COORDINATES
     # ─────────────────────────────────────────────────────────────
     def _load_coords(self):
-        # 1) try permanent JSON
+        # 1) Parse coordinates.txt first for any user edits
+        try:
+            if os.path.exists(COORDINATES_PATH):
+                for line in open(COORDINATES_PATH, encoding="utf-8"):
+                    line = line.strip()
+                    if "Pluck Saved:" in line and "Unpluck" not in line:
+                        self.pluck_coords = ast.literal_eval(
+                            line.split("Pluck Saved:")[1].strip())
+                    elif "Unpluck Saved:" in line:
+                        self.unpluck_coords = ast.literal_eval(
+                            line.split("Unpluck Saved:")[1].strip())
+
+                if self.pluck_coords and self.unpluck_coords:
+                    json.dump({"pluck": self.pluck_coords,
+                               "unpluck": self.unpluck_coords},
+                              open(SAVED_CONFIG_PATH, "w"), indent=2)
+                    print(f"[OK] loaded coordinates.txt  pluck={self.pluck_coords}  "
+                          f"unpluck={self.unpluck_coords}")
+                    return
+        except Exception as e:
+            print(f"[WARN] parse coordinates.txt: {e}")
+
+        # 2) Fallback to saved_coordinates.json
         if os.path.exists(SAVED_CONFIG_PATH):
             try:
                 d = json.load(open(SAVED_CONFIG_PATH))
                 self.pluck_coords   = d["pluck"]
                 self.unpluck_coords = d["unpluck"]
-                print(f"[OK] saved coords loaded  pluck={self.pluck_coords}  "
+                print(f"[OK] loaded saved_coordinates.json  pluck={self.pluck_coords}  "
                       f"unpluck={self.unpluck_coords}")
-                return
-            except Exception:
-                pass
-
-        # 2) parse coordinates.txt
-        try:
-            for line in open(COORDINATES_PATH, encoding="utf-8"):
-                line = line.strip()
-                if "Pluck Saved:" in line and "Unpluck" not in line:
-                    self.pluck_coords = ast.literal_eval(
-                        line.split("Pluck Saved:")[1].strip())
-                elif "Unpluck Saved:" in line:
-                    self.unpluck_coords = ast.literal_eval(
-                        line.split("Unpluck Saved:")[1].strip())
-
-            if self.pluck_coords and self.unpluck_coords:
-                json.dump({"pluck": self.pluck_coords,
-                           "unpluck": self.unpluck_coords},
-                          open(SAVED_CONFIG_PATH, "w"), indent=2)
-                print(f"[OK] parsed & saved  pluck={self.pluck_coords}  "
-                      f"unpluck={self.unpluck_coords}")
-        except Exception as e:
-            print(f"[ERR] coordinates: {e}")
+            except Exception as e:
+                print(f"[ERR] saved_coordinates.json: {e}")
 
     # ─────────────────────────────────────────────────────────────
     # SERIAL
     # ─────────────────────────────────────────────────────────────
     def _connect_serial(self):
         if not HAS_SERIAL:
-            return
-        for p in serial.tools.list_ports.comports():
+            return False
+        if self.ser and self.ser.is_open:
+            return True
+
+        ports = list(serial.tools.list_ports.comports())
+        for p in ports:
             try:
-                self.ser = serial.Serial(p.device, 115200, timeout=0.05)
-                print(f"[OK] serial → {p.device}  ({p.description})")
-                return
-            except Exception:
+                self.ser = serial.Serial(p.device, 115200, timeout=0.1)
+                time.sleep(0.05)
+                print(f"[OK] Serial connected → {p.device} ({p.description})")
+                return True
+            except serial.SerialException as se:
+                err_str = str(se)
+                if "PermissionError" in err_str or "Access is denied" in err_str:
+                    print(f"[ERR] Port {p.device} is in use / locked by another process (e.g. Python GUI.py)! Please close it.")
+                else:
+                    print(f"[WARN] Failed to open {p.device}: {se}")
                 continue
-        print("[WARN] no serial port found")
+            except Exception as e:
+                print(f"[WARN] Failed to open {p.device}: {e}")
+                continue
+
+        print("[WARN] no serial port found (check USB cable to ESP32)")
+        return False
 
     def _tx(self, cmd):
-        """Send a raw serial command with dedup."""
+        """Send a raw serial command with dedup & real-time console log."""
+        if not self.ser or not self.ser.is_open:
+            if not self._connect_serial():
+                return
+
         if ":" in cmd:
             k, v = cmd.split(":", 1)
             if self.last_sent.get(k) == v:
                 return
-            self.last_sent[k] = v
+
         if self.ser and self.ser.is_open:
             try:
                 self.ser.write((cmd + "\n").encode())
-            except Exception:
-                pass
+                if ":" in cmd:
+                    k, v = cmd.split(":", 1)
+                    self.last_sent[k] = v
+                print(f"[SERIAL TX] {cmd}")
+            except Exception as e:
+                print(f"[SERIAL ERR] Failed to send {cmd}: {e}")
 
     def _tx_joint(self, prefix, slider_val):
         """Apply inversion (same as Python GUI) then send."""
@@ -439,6 +509,11 @@ class KattadiApp:
         self._vhs_canvas_img = self.canvas.create_image(
             0, 0, anchor="nw", image=self._vhs_photos[0]
         )
+        if HAS_AUDIO and self.snd_static:
+            try:
+                self.snd_static.play()
+            except Exception as e:
+                print(f"[WARN] static play: {e}")
         self._vhs_step()
 
     def _vhs_step(self):
@@ -448,7 +523,12 @@ class KattadiApp:
         idx = int(elapsed * self._vhs_fps)
 
         if idx >= self._vhs_total or elapsed >= 5.0:
-            # VHS sequence completed! Free memory & transition to camera
+            # VHS sequence completed! Stop audio, free memory & transition to camera
+            if HAS_AUDIO and self.snd_static:
+                try:
+                    self.snd_static.stop()
+                except Exception:
+                    pass
             self._vhs_photos = []
             self._vhs_canvas_img = None
             self._camera_phase()
@@ -613,10 +693,10 @@ class KattadiApp:
             self.root.after(30, self._scan_tick)
             return
 
-        # ── silent detection ─────────────────
+        # ── detection ────────────────────────
         res = detect_pappadam(frm, self.bg_gray)
         if res:
-            cx, cy, r, circ = res
+            cx, cy, r, circ, bbox = res
             self.lock_hist.append((cx, cy, r))
             if len(self.lock_hist) > LOCK_STABLE_FRAMES:
                 self.lock_hist.pop(0)
@@ -626,32 +706,80 @@ class KattadiApp:
                 if (max(xs)-min(xs) <= LOCK_MOVE_TOLERANCE and
                         max(ys)-min(ys) <= LOCK_MOVE_TOLERANCE):
                     self.lock_target = (cx, cy, r)
+                    self.lock_conf = min(99.4, max(65.0, circ * 100.0))
                     self._begin_target()
                     return
         else:
             self.lock_hist = []
 
-        # ── detective HUD ────────────────────
-        disp = self._draw_hud(frm)
+        # ── detective HUD with bounding box & confidence ────
+        disp = self._draw_hud(frm, det=res)
         self._show_bgr(disp)
         self.hud_tick += 1
         self.root.after(30, self._scan_tick)
 
     # ─── HUD renderer ───────────────────────────────────────────
-    def _draw_hud(self, frm):
+    def _draw_hud(self, frm, det=None):
         d = frm.copy()
         h, w = d.shape[:2]
 
-        # colour palette (BGR) — NO GREEN
+        # colour palette (BGR)
         CY  = (255, 200, 0)      # cyan
         AM  = (0, 165, 255)      # amber
         WH  = (220, 220, 220)    # white
-        DM  = (100, 80, 0)      # dim cyan
+        DM  = (100, 80, 0)       # dim cyan
         RD  = (0, 0, 255)        # red
 
         m  = 14   # margin
         bl = 38   # bracket length
         bt = 2    # bracket thickness
+
+        # ── draw detected bounding box & confidence score ────
+        if det:
+            cx, cy, r, circ, bbox = det
+            bx, by, bw, bh = bbox
+            conf_pct = min(99.4, max(65.0, circ * 100.0))
+
+            # Bounding box (tactical yellow / amber)
+            BOX_CLR = (0, 255, 255)
+            cv2.rectangle(d, (bx, by), (bx + bw, by + bh), BOX_CLR, 2)
+
+            # High-tech corner accents on bounding box
+            cl = min(18, min(bw, bh) // 4)
+            ct = 3
+            # Top-left
+            cv2.line(d, (bx, by), (bx + cl, by), BOX_CLR, ct)
+            cv2.line(d, (bx, by), (bx, by + cl), BOX_CLR, ct)
+            # Top-right
+            cv2.line(d, (bx + bw, by), (bx + bw - cl, by), BOX_CLR, ct)
+            cv2.line(d, (bx + bw, by), (bx + bw, by + cl), BOX_CLR, ct)
+            # Bottom-left
+            cv2.line(d, (bx, by + bh), (bx + cl, by + bh), BOX_CLR, ct)
+            cv2.line(d, (bx, by + bh), (bx, by + bh - cl), BOX_CLR, ct)
+            # Bottom-right
+            cv2.line(d, (bx + bw, by + bh), (bx + bw - cl, by + bh), BOX_CLR, ct)
+            cv2.line(d, (bx + bw, by + bh), (bx + bw - cl, by + bh), BOX_CLR, ct)
+
+            # Center target crosshair
+            cs = 8
+            cv2.line(d, (cx - cs, cy), (cx + cs, cy), BOX_CLR, 1)
+            cv2.line(d, (cx, cy - cs), (cx, cy + cs), BOX_CLR, 1)
+
+            # Confidence Badge / Pill
+            label = f"PAPPADAM: {conf_pct:.1f}%"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            fscale = 0.55
+            fthick = 1
+            (tw, th), _ = cv2.getTextSize(label, font, fscale, fthick)
+
+            py2 = by - 6 if by - 24 > 50 else by + th + 10
+            py1 = py2 - th - 6
+            px1 = bx
+            px2 = bx + tw + 14
+
+            cv2.rectangle(d, (px1, py1), (px2, py2), BOX_CLR, -1)
+            cv2.putText(d, label, (px1 + 7, py2 - 4),
+                        font, fscale, (0, 0, 0), fthick, cv2.LINE_AA)
 
         # ── dark top / bottom bands for text readability ─────
         overlay_band = d.copy()
@@ -696,8 +824,20 @@ class KattadiApp:
         # ── bottom-left: system name + status ─
         cv2.putText(d, "PAPPADAM TACTICAL TARGETING SYSTEM",
                     (m+8, h-m-28), cv2.FONT_HERSHEY_SIMPLEX, 0.4, CY, 1)
-        cv2.putText(d, "STATUS: SCANNING",
-                    (m+8, h-m-8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, AM, 1)
+        if det:
+            conf_pct = min(99.4, max(65.0, det[3] * 100.0))
+            lock_cnt = len(self.lock_hist)
+            if lock_cnt >= LOCK_STABLE_FRAMES:
+                st_text = f"STATUS: TARGET LOCKED [CONF: {conf_pct:.1f}%]"
+                st_clr = (0, 255, 255)
+            else:
+                st_text = f"STATUS: PAPPADAM DETECTED ({lock_cnt}/{LOCK_STABLE_FRAMES}) [CONF: {conf_pct:.1f}%]"
+                st_clr = (0, 255, 128)
+        else:
+            st_text = "STATUS: SCANNING"
+            st_clr = AM
+        cv2.putText(d, st_text,
+                    (m+8, h-m-8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, st_clr, 1)
 
         # ── bottom-right: time / date ────────
         cv2.putText(d, time.strftime("%H:%M:%S"),
@@ -772,8 +912,9 @@ class KattadiApp:
 
         # ── "TARGET ACQUIRED" banner ─────────
         cv2.rectangle(disp, (0, 0), (fw, 55), (0, 0, 0), -1)
-        cv2.putText(disp, "TARGET ACQUIRED", (18, 38),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+        conf_str = f"  |  CONF: {self.lock_conf:.1f}%" if hasattr(self, 'lock_conf') else ""
+        cv2.putText(disp, f"TARGET ACQUIRED{conf_str}", (18, 38),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
 
         # ── overlay detection.png when fully zoomed ──
         if prog >= 1.0 and self.det_overlay:
@@ -798,57 +939,105 @@ class KattadiApp:
         return cv2.cvtColor(np.array(base.convert("RGB")), cv2.COLOR_RGB2BGR)
 
     # ═════════════════════════════════════════════════════════════
-    # STATE 7 — CELEBRATION VIDEO
+    # STATE 7 — CELEBRATION VIDEO (Smooth 30-45 FPS, time-synced)
     # ═════════════════════════════════════════════════════════════
     def _play_celeb(self):
         self.state = "CELEB"
         self.canvas.delete("all")
         self._celeb_canvas_img = None
-        self._cc = cv2.VideoCapture(CELEBRATION_VID_PATH)
-        if not self._cc.isOpened():
-            print("[WARN] celebration video not found — skipping")
+
+        # 1) If pre-cached in RAM
+        if self._celeb_frames:
+            self._celeb_photos = [
+                ImageTk.PhotoImage(Image.fromarray(f)) for f in self._celeb_frames
+            ]
+        else:
+            # 2) Fallback: read from optimized file
+            src = CELEB_OPTIMIZED_PATH if os.path.exists(CELEB_OPTIMIZED_PATH) else CELEBRATION_VID_PATH
+            if not os.path.exists(src):
+                print("[WARN] celebration video not found — skipping")
+                self._begin_pluck()
+                return
+            cap = cv2.VideoCapture(src)
+            self._celeb_photos = []
+            while True:
+                ret, f = cap.read()
+                if not ret:
+                    break
+                f = cv2.resize(f, (self.sw, self.sh), interpolation=cv2.INTER_LINEAR)
+                f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+                self._celeb_photos.append(ImageTk.PhotoImage(Image.fromarray(f)))
+            cap.release()
+
+        if not self._celeb_photos:
+            print("[WARN] No celebration frames available — skipping")
             self._begin_pluck()
             return
-        fps = self._cc.get(cv2.CAP_PROP_FPS) or 30
-        self._cdel = max(1, int(1000 / fps))
-        self._celeb_frame()
 
-    def _celeb_frame(self):
+        self._celeb_total = len(self._celeb_photos)
+        self._celeb_fps = 30.0
+        self._celeb_start_time = time.time()
+        self._celeb_canvas_img = self.canvas.create_image(
+            0, 0, anchor="nw", image=self._celeb_photos[0]
+        )
+        if HAS_AUDIO and self.snd_celeb:
+            try:
+                self.snd_celeb.play()
+            except Exception as e:
+                print(f"[WARN] celeb play: {e}")
+        self._celeb_step()
+
+    def _celeb_step(self):
         if self.state != "CELEB" or not self.running:
             return
-        ok, f = self._cc.read()
-        if not ok:
-            self._cc.release()
+        elapsed = time.time() - self._celeb_start_time
+        idx = int(elapsed * self._celeb_fps)
+
+        if idx >= self._celeb_total or elapsed >= (self._celeb_total / self._celeb_fps + 0.3):
+            if HAS_AUDIO and self.snd_celeb:
+                try:
+                    self.snd_celeb.stop()
+                except Exception:
+                    pass
+            self._celeb_photos = []
             self._celeb_canvas_img = None
             self._begin_pluck()
             return
-        f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
-        f = cv2.resize(f, (self.sw, self.sh))
-        self._pr = ImageTk.PhotoImage(Image.fromarray(f))
-        if self._celeb_canvas_img is None:
-            self.canvas.delete("all")
-            self._celeb_canvas_img = self.canvas.create_image(
-                0, 0, anchor="nw", image=self._pr
-            )
-        else:
-            self.canvas.itemconfig(self._celeb_canvas_img, image=self._pr)
-        self.root.after(self._cdel, self._celeb_frame)
+
+        self.canvas.itemconfig(self._celeb_canvas_img, image=self._celeb_photos[idx])
+        self.root.after(10, self._celeb_step)
 
     # ═════════════════════════════════════════════════════════════
     # STATE 8 — PLUCK  /  UNPLUCK  (serial, background)
+    # ═════════════════════════════════════════════════════════════
+    # ═════════════════════════════════════════════════════════════
+    # STATE 8 — PLUCK  /  UNPLUCK  (Exact Python GUI Logic)
     # ═════════════════════════════════════════════════════════════
     def _begin_pluck(self):
         self.state = "PLUCK"
         self.canvas.delete("all")
 
         self._sid = self.canvas.create_text(
-            self.sw//2, self.sh//2 - 30,
+            self.sw // 2, self.sh // 2 - 30,
             text=">>> EXECUTING PLUCK SEQUENCE",
             font=("Consolas", 26, "bold"), fill="#00FF88")
         self._ssid = self.canvas.create_text(
-            self.sw//2, self.sh//2 + 25,
-            text="Moving arm to pluck position...",
+            self.sw // 2, self.sh // 2 + 25,
+            text="Initializing zero position & preparing pluck...",
             font=("Consolas", 14), fill="#888888")
+
+        # 1. Connect serial if not already connected
+        if not self._connect_serial():
+            self.canvas.itemconfig(self._sid,
+                                   text="SERIAL DISCONNECTED", fill="#FF4444")
+            self.canvas.itemconfig(self._ssid,
+                                   text="Cannot open serial port. Ensure Python GUI.py is closed & ESP32 plugged in.",
+                                   fill="#FF8888")
+            self.root.after(4000, self._begin_reset)
+            return
+
+        # 2. Reload latest coordinates directly from coordinates.txt
+        self._load_coords()
 
         if not self.pluck_coords or not self.unpluck_coords:
             self.canvas.itemconfig(self._sid,
@@ -856,58 +1045,94 @@ class KattadiApp:
             self.root.after(3000, self._begin_reset)
             return
 
-        self._tx("P:ON")
+        # 3. Power on system (matches Python GUI toggle_power -> P:ON)
         self.last_sent.clear()
-        self.root.after(350, lambda: self._anim_arm(
-            self.pluck_coords, self._pluck_done))
+        self._tx("P:ON")
 
-    def _anim_arm(self, tgt, callback):
-        """50-step smooth arm interpolation → gripper → callback."""
-        keys  = ['A1', 'A2', 'A3', 'A4']
-        steps = 50
-        delay = 40    # ms per step  → ~2 s total
-        st = dict(self.cur_pos)
-        inc = {k: (tgt[k] - st[k]) / steps for k in keys}
+        # 4. Starting position: ALL ZERO baseline with gripper OPEN (G: 90)
+        # Physically transmit all zero baseline so robot arm is guaranteed at zero
+        starts_zero = {'A1': 0, 'A2': 0, 'A3': 0, 'A4': 0, 'G': 90}
+        for k in ['A1', 'A2', 'A3', 'A4', 'G']:
+            self._tx_joint(k, starts_zero[k])
+            self.cur_pos[k] = starts_zero[k]
 
-        def step(i):
-            if not self.running:
+        self.canvas.itemconfig(self._ssid,
+                               text=f"Moving from ALL ZERO to Pluck: {self.pluck_coords}...")
+
+        # 5. Move arm from all zero to Pluck coordinates (duration=2.0s, 50 steps)
+        # Phase 1: Arm moves from zero to pluck coordinates over 2.0s
+        # Phase 2: Gripper G closes to pluck_coords['G'] (0)
+        self.root.after(400, lambda: self._animate_pose(
+            starts=starts_zero,
+            targets=self.pluck_coords,
+            duration=2.0,
+            callback=self._pluck_done
+        ))
+
+    def _animate_pose(self, starts, targets, duration, callback):
+        """Exact Python GUI sequenced animator: Arm first (50 steps), then Gripper."""
+        arm_steps = 50
+        arm_delay_ms = int((duration / arm_steps) * 1000)   # 40ms per step
+        arm_keys = ['A1', 'A2', 'A3', 'A4']
+
+        # Calculate increments for arm joints only (exactly as Python GUI line 285)
+        arm_increments = {k: (targets[k] - starts[k]) / arm_steps for k in arm_keys if k in targets}
+
+        def step_arm(current_step):
+            if not self.running or self.state != "PLUCK":
                 return
-            if i <= steps:
-                for k in keys:
-                    v = int(st[k] + inc[k] * i)
-                    self._tx_joint(k, v)
-                    self.cur_pos[k] = v
-                self.root.after(delay, step, i + 1)
+            if current_step <= arm_steps:
+                for key in arm_keys:
+                    if key in targets:
+                        val = int(starts[key] + arm_increments[key] * current_step)
+                        self._tx_joint(key, val)
+                        self.cur_pos[key] = val
+                self.root.after(arm_delay_ms, step_arm, current_step + 1)
             else:
-                # gripper phase
-                if 'G' in tgt:
-                    self._tx_joint('G', tgt['G'])
-                    travel = abs(tgt['G'] - st.get('G', 0))
-                    self.cur_pos['G'] = tgt['G']
-                    self.root.after(travel * 15 + 250, callback)
+                # Phase 2: Arm completely stopped at target position! Actuate gripper
+                if 'G' in targets:
+                    actuate_gripper()
                 else:
                     callback()
-        step(1)
+
+        def actuate_gripper():
+            target_g = targets['G']
+            start_g = starts.get('G', 0)
+            self._tx_joint('G', target_g)
+            self.cur_pos['G'] = target_g
+            # 15ms per degree of change + 250ms hold (matches Python GUI line 316)
+            time_to_close_ms = abs(target_g - start_g) * 15 + 250
+            self.root.after(time_to_close_ms, callback)
+
+        step_arm(1)
 
     def _pluck_done(self):
-        if not self.running:
+        if not self.running or self.state != "PLUCK":
             return
-        print("[OK] pluck complete")
+        print(f"[OK] Pluck position reached {self.cur_pos} & gripper closed!")
         self.canvas.itemconfig(self._ssid,
-                               text="Pluck complete! Returning to home...")
+                               text=f"Pluck complete! Moving to Unpluck: {self.unpluck_coords}...")
         self.last_sent.clear()
-        self.root.after(600, lambda: self._anim_arm(
-            self.unpluck_coords, self._unpluck_done))
+
+        # Phase 3 & 4: Move from pluck coordinates to unpluck coordinates from coordinates.txt
+        # starts = current pluck position (with gripper closed at G=0)
+        # targets = unpluck_coords (moves arm to unpluck, then releases G to 90)
+        starts_pluck = dict(self.cur_pos)
+        self.root.after(700, lambda: self._animate_pose(
+            starts=starts_pluck,
+            targets=self.unpluck_coords,
+            duration=2.0,
+            callback=self._unpluck_done
+        ))
 
     def _unpluck_done(self):
-        if not self.running:
+        if not self.running or self.state != "PLUCK":
             return
-        print("[OK] unpluck complete")
+        print(f"[OK] Unpluck position reached {self.cur_pos} & gripper opened!")
         self.canvas.itemconfig(self._sid,
                                text="[ OK ] MISSION ACCOMPLISHED")
         self.canvas.itemconfig(self._ssid,
-                               text="Resetting in 5 seconds...")
-        self._tx("P:OFF")
+                               text="Target plucked and released. Resetting in 5 seconds...")
         self.root.after(600, self._begin_reset)
 
     # ═════════════════════════════════════════════════════════════
@@ -970,6 +1195,10 @@ class KattadiApp:
         self.cam_stop.set()
         if HAS_AUDIO:
             try:
+                if self.snd_static:
+                    self.snd_static.stop()
+                if self.snd_celeb:
+                    self.snd_celeb.stop()
                 pygame.mixer.music.stop()
                 pygame.mixer.quit()
             except Exception:
