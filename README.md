@@ -3,7 +3,7 @@
 
 # Pappadam Plucker
 
-![Pappadam Plucker Front Page](./assets/front_page.png)
+![Pappadam Plucker Front Page](./assets/front page(1).png)
 
 > An unnecessarily advanced robotic system that detects a pappadam, locks onto it, and crushes it before it can peacefully join your rice and curry.
 
