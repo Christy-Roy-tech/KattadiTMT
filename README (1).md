@@ -150,7 +150,7 @@ On first launch, the app asks you to drag a rectangle tightly around the plate. 
 
 ### Workflow Diagram
 
-![Workflow Diagram](./assets/workflow_diagram.svg)
+![Workflow Diagram](./assets/workflow.png)
 
 *Splash screen → VHS transition → empty-plate calibration → silent scanning (cowboy theme) → target lock with zoom + aim overlay → celebration video → pluck + crush → return home → 5-second reset → loop forever.*
 
@@ -171,10 +171,6 @@ On first launch, the app asks you to drag a rectangle tightly around the plate. 
 ![Final build model](./assets/build_image.jpeg)
 
 *The completed Autonomous Pappadam Plucker ready for testing.*
-
-![Live build session](./assets/build_venue_photo.jpg)
-
-*Debugging the detector live at the venue — the laptop screen shows the actual camera feed and code side by side.*
 
 
 ## Build Log
@@ -210,7 +206,7 @@ On first launch, the app asks you to drag a rectangle tightly around the plate. 
 
 ### Video
 
-[Final demo video](./assets/final_demo.mp4)
+[Final demo video](./assets/demo.mp4)
 
 *Shows empty-plate calibration, pappadam detection, crosshair target lock, robotic movement to the saved pluck position, crunch sound playback, and safe return to the home position.*
 
