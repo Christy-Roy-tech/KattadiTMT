@@ -90,7 +90,7 @@ uv pip install opencv-python numpy customtkinter pyserial pillow pygame
 6. Update the camera URL in the Python file:
 
 ```python
-PHONE_URL = "http://YOUR_PHONE_IP:8080/video"
+PHONE_URL = "http://192.168.132.198:808//video"
 ```
 
 7. Run the integrated application:
@@ -161,22 +161,8 @@ This reduces false targets caused by hands, plate reflections, shadows, rectangu
 *Second power-module revision with a 3S BMS, 3A buck converter, DC barrel connector, and cleaner cable routing.*
 
 ### Build Photos
+Final build model (./assets/build_image.jpeg)
 
-![Pappadam Plucker front page](./assets/front%20page%20(1).png)
-
-*Project front page and main build presentation.*
-
-![Pappadam detection target](./assets/pappadam_labeled.png)
-
-*Labeled pappadam target used during the computer-vision detection workflow.*
-
-![Power module wiring](./assets/power_module_wiring_1.png)
-
-*First power-module wiring build.*
-
-![Power module wiring revision](./assets/power_module_wiring_2.png)
-
-*Second power-module wiring revision.*
 
 ## Build Log
 
