@@ -1,5 +1,8 @@
 # Autonomous Pappadam Plucker — Build Log
 **Team:** KattadiTMT — TinkerHub Useless Projects 3.0
+![alt text](image.png)
+![Pappadam Plucker front page](./assets/front_page.png)
+*The app's splash screen — this is also the actual `front_page.png` asset used by the software.*
 
 Keep this updated as you complete each step of the build guide. Copy the finished
 sections straight into your submission README when you're done.
@@ -36,6 +39,17 @@ fully hands-free.
 - Servos: MG995 (base rotation, shoulder, wrist pitch), SG90 (elbow, wrist roll, gripper)
 - ESP8266-based glove controller (optional manual override input, via ESP-NOW)
 - Phone (any Android device with IP Webcam installed), mounted to view the plate
+- Custom power module: 2S/3S battery packs, BMS boards, buck converters, rocker switch (see Circuit section below)
+
+---
+
+## Circuit & Power Module
+
+![Power module wiring, first revision](./assets/power_module_wiring_1.png)
+*First power module build: DC-DC buck converter, rocker switch, 2S BMS, and motor output wiring, all housed in a repurposed plastic container.*
+
+![Power module wiring, second revision](./assets/power_module_wiring_2.png)
+*Second revision: 3S BMS, a 3A buck converter, a proper DC barrel connector for power input, and a 2-cell holder — cleaner routing than v1.*
 
 ---
 
@@ -77,6 +91,9 @@ walls, etc.), the detector:
 ---
 
 ## Screenshots (add at least 3)
+![Pappadam, labeled](./assets/pappadam_labeled.png)
+*The actual target — a pappadam sitting in the detection tray, labeled for reference.*
+
 ![Camera detection working](add-screenshot-here.png)
 *Caption: crosshair locked onto a pappadam during standalone detector testing*
 
@@ -88,3 +105,21 @@ walls, etc.), the detector:
 
 ## Workflow Diagram
 *(Use the state-machine diagram from earlier in the build conversation: Intro → CRT transition → Scanning → Target locked → Pluck triggered → Return to home → back to Scanning)*
+
+---
+
+## Project Demo
+
+**Additional demo — early attempt:** [failed_attempt_demo.mp4](./assets/failed_attempt_demo.mp4)
+*An earlier attempt at the full sequence that didn't work yet — kept as a record of the process, not the final result. Good material for the "what went wrong" part of the story below.*
+
+---
+
+## Project Journal Material (for the GitHub Pages storytelling page)
+Use this section as raw material when you write the day-by-day narrative — don't just link these, tell the story around them.
+
+- **A breakthrough-in-progress moment:** `failed_attempt_demo.mp4` — this is exactly the kind of "it didn't work yet" footage the journal rubric wants sitting next to the eventual working version. Pair it with a short paragraph on what specifically failed and what you changed afterward (the debug-log-driven tuning process — pale-pappadam color range, hull-based circularity, the ROI box — is a genuinely good "how we debugged it" story beat).
+- **Hardware evolution:** `power_module_wiring_1.png` → `power_module_wiring_2.png` is a nice before/after pair showing iteration on the power module (2S → 3S BMS, added a proper barrel connector, cleaner wiring) — worth a "Learnings & discoveries" callout on why the revision happened.
+- **The target itself:** `pappadam_labeled.png` is a good lightweight image for introducing the problem at the top of the journal page.
+- **The front page:** `front_page.png` doubles as your journal page's hero/banner image.
+
