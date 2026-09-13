@@ -161,7 +161,10 @@ This reduces false targets caused by hands, plate reflections, shadows, rectangu
 *Second power-module revision with a 3S BMS, 3A buck converter, DC barrel connector, and cleaner cable routing.*
 
 ### Build Photos
-Final build model (./assets/build_image.jpeg)
+
+![Final build model](./assets/build_image.jpeg)
+
+*The completed Autonomous Pappadam Plucker ready for testing.*
 
 
 ## Build Log
